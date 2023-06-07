@@ -58,32 +58,36 @@ def experiment(
     norm_mode = variant['norm_mode']
     c_mode = variant['comb']
     
-    group_name = f'{exp_prefix}-{env_name}-{dataset}' + f'-bias-{bias_mode}-{norm_mode}'
+    group_name = f'{exp_prefix}-{env_name}-{dataset}' + f'-{bias_mode}-{norm_mode}'
     if bias_mode != 'b0':
         group_name += f'-{c_mode}'
     train_seed = variant['seed']
     exp_prefix = f'{group_name}-seed-{train_seed}-{random.randint(int(1e5), int(1e6) - 1)}'
 
-    if env_name == 'hopper':
-        env = gym.make('Hopper-v3')
+    if env_name == 'antmaze-umaze':
+        import d4rl
+        env = gym.make('antmaze-umaze-v0')
         max_ep_len = 1000
-        env_targets = [3600,]  
-        # env_targets = [3000, 2400, 1200, 600]
-        # env_targets = [6000, 4500, 3600, 2400, 1200, 600]
-        scale = 1000.  # normalization for rewards/returns
-    elif env_name == 'halfcheetah':
-        env = gym.make('HalfCheetah-v3')
+    elif env_name == 'antmaze-umaze-diverse':
+        import d4rl
+        env = gym.make('antmaze-umaze-diverse-v2')
         max_ep_len = 1000
-        env_targets = [6000,]#  6000]
-        # env_targets = [6000, 4000]
-        # env_targets = [12000,10000, 8000, 4000, 2000]
-        scale = 1000.
-    elif env_name == 'walker2d':
-        env = gym.make('Walker2d-v3')
+    elif env_name == 'antmaze-medium-play':
+        import d4rl
+        env = gym.make('antmaze-medium-play-v2')
         max_ep_len = 1000
-        env_targets = [5000] #, 2500]
-        
-        scale = 1000.
+    elif env_name == 'antmaze-medium-diverse':
+        import d4rl
+        env = gym.make('antmaze-medium-diverse-v2')
+        max_ep_len = 1000
+    elif env_name == 'antmaze-large-play':
+        import d4rl
+        env = gym.make('antmaze-large-play-v2')
+        max_ep_len = 1000
+    elif env_name == 'antmaze-large-diverse':
+        import d4rl
+        env = gym.make('antmaze-large-diverse-v2')
+        max_ep_len = 1000
     else:
         raise NotImplementedError
 
@@ -94,33 +98,35 @@ def experiment(
     act_dim = env.action_space.shape[0]
 
     # load dataset
-    dataset_path = f'./../../data/{env_name}-{dataset}-v2.pkl'
+    dataset_path = f'./../../data/{env_name}-v2.pkl'
     
     with open(dataset_path, 'rb') as f:
         trajectories = pickle.load(f)
         trajecotry_stats(trajectories )
         # trajecotries is a list.
-        # ach element is a trajecotry dict with keys: observations, next observations, rewards terminals
+        # each element is a trajecotry dict with keys: observations, next observations, rewards terminals
     # save all path information into separate lists
     mode = variant.get('mode', 'normal')
-    states, traj_lens, returns = [], [], []
+    states, traj_lens, returns, goals = [], [], [], []
     for path in trajectories:
         if mode == 'delayed':  # delayed: all rewards moved to end of trajectory
             path['rewards'][-1] = path['rewards'].sum()
             path['rewards'][:-1] = 0.
         states.append(path['observations'])
+        goals.append(path['infos/goal'])
         traj_lens.append(len(path['observations']))
         returns.append(path['rewards'].sum())
     traj_lens, returns = np.array(traj_lens), np.array(returns)
 
     # used for input normalization
     states = np.concatenate(states, axis=0)
+    goals = np.concatenate(goals, axis=0)
     state_mean, state_std = np.mean(states, axis=0), np.std(states, axis=0) + 1e-6
-
+    xy_mean, xy_std = state_mean[:2], state_std[:2]
     num_timesteps = sum(traj_lens)
 
     print('=' * 50)
-    print(f'Starting new experiment: {env_name} {dataset}')
+    print(f'Starting new experiment: {env_name}')
     print(f'{len(traj_lens)} trajectories, {num_timesteps} timesteps found')
     print(f'Average return: {np.mean(returns):.2f}, std: {np.std(returns):.2f}')
     print(f'Max return: {np.max(returns):.2f}, min: {np.min(returns):.2f}')
@@ -128,6 +134,7 @@ def experiment(
 
     K = variant['K']
     batch_size = variant['batch_size']
+    waypoint_ahead = variant['waypoint']
     pct_traj = variant.get('pct_traj', 1.)
 
     # only train on top pct_traj trajectories (for %BC experiment)
@@ -153,15 +160,18 @@ def experiment(
             p=p_sample,  # reweights so we sample according to timesteps of each trajecotry
         )
 
-        s, a, d, rtg, timesteps, mask, lens =  [], [], [], [], [], [], []
+        s, a, d, xygoals, waypoints, timesteps, mask =  [], [], [], [], [], [], []
 
         for i in range(batch_size):
             # process each trajectory (batch_inds[i]) of a batch
             traj = trajectories[int(sorted_inds[batch_inds[i]])]
+            goal = traj['infos/goal'][-1]
+            if traj['rewards'][-1] < 1.0:
+                # use HER to relabel a failed trajectory
+                goal = traj['observations'][-1][:2]
             # si is the starting timestep
             si = random.randint(0, traj['rewards'].shape[0] - 1)
             true_len = len( traj['observations'][si:si + max_len] )
-            lens.append(true_len)
             # an extra dimension is added at dimension 0, the rest are the same
             s.append(traj['observations'][si:si + max_len].reshape(1, -1, state_dim))
             a.append(traj['actions'][si:si + max_len].reshape(1, -1, act_dim))
@@ -172,19 +182,38 @@ def experiment(
                 d.append(traj['dones'][si:si + max_len].reshape(1, -1))
             timesteps.append(np.arange(si, si + s[-1].shape[1]).reshape(1, -1))
             timesteps[-1][timesteps[-1] >= max_ep_len] = max_ep_len-1  # padding cutoff
-            # return to go
-            rtg.append(discount_cumsum(traj['rewards'][si:], gamma=1.)[:s[-1].shape[1] + 1].reshape(1, -1, 1))
-            if rtg[-1].shape[1] <= s[-1].shape[1]:
-                rtg[-1] = np.concatenate([rtg[-1], np.zeros((1, 1, 1))], axis=1)
+            # goal and subgoal (waypoint_ahead)
+            way_point = traj['observations'][si + waypoint_ahead : si + max_len + waypoint_ahead][:,:2]
+            if len(way_point) == 0:
+                way_point = np.broadcast_to( traj['observations'][si: si + max_len][:,-1][:2], (true_len , 2) )
+                # assert False, f"{way_point.shape} {true_len} " 
+            x_y = traj['observations'][si: si + max_len][:,:2]
+            if len(way_point) < true_len:
+                way_point = np.concatenate( 
+                    [
+                        way_point, 
+                        np.broadcast_to( way_point[-1], (true_len - len(way_point), 2) ) 
+                    ] )
+            extend_goal = np.broadcast_to( goal, (true_len,2) )
+            x_y = (x_y - xy_mean) / xy_std
+            extend_goal = (extend_goal - xy_mean) / xy_std
+            xygoal = np.hstack([x_y, extend_goal])
+
+            # dim is 4 because xy + goal
+            xygoals.append(xygoal.reshape(1, -1, 4))
+            waypoints.append(way_point.reshape(1, -1, 2))
 
             # padding and state + reward normalization.
             # left pad if Gpt2, right pad for pytorch transformer
             tlen = s[-1].shape[1]
             s[-1] = np.concatenate([ s[-1], np.zeros((1, max_len - tlen, state_dim))], axis=1)
             s[-1] = (s[-1] - state_mean) / state_std
+
+            xygoals[-1] = np.concatenate([ xygoals[-1], np.zeros((1, max_len - tlen, 4))], axis=1)
+            waypoints[-1] = np.concatenate([ waypoints[-1], np.zeros((1, max_len - tlen, 2))], axis=1)
+            
             a[-1] = np.concatenate([ a[-1], np.ones((1, max_len - tlen, act_dim)) * -10.], axis=1)
             d[-1] = np.concatenate([ d[-1], np.ones((1, max_len - tlen)) * 2], axis=1)
-            rtg[-1] = np.concatenate([rtg[-1], np.zeros((1, max_len - tlen, 1)), ], axis=1) / scale
 
             timesteps[-1] = np.concatenate([ timesteps[-1], np.zeros((1, max_len - tlen))], axis=1)
             # 1s are what we want to attend. 0s denotes masking due to padding
@@ -193,11 +222,12 @@ def experiment(
         s = torch.from_numpy(np.concatenate(s, axis=0)).to(dtype=torch.float32, device=device)
         a = torch.from_numpy(np.concatenate(a, axis=0)).to(dtype=torch.float32, device=device)
         d = torch.from_numpy(np.concatenate(d, axis=0)).to(dtype=torch.long, device=device)
-        rtg = torch.from_numpy(np.concatenate(rtg, axis=0)).to(dtype=torch.float32, device=device)
+        xygoals = torch.from_numpy(np.concatenate(xygoals, axis=0)).to(dtype=torch.float32, device=device)
+        waypoints = torch.from_numpy(np.concatenate(waypoints, axis=0)).to(dtype=torch.float32, device=device)
         timesteps = torch.from_numpy(np.concatenate(timesteps, axis=0)).to(dtype=torch.long, device=device)
         mask = torch.from_numpy(np.concatenate(mask, axis=0)).to(device=device)
 
-        return s, a, d, rtg, timesteps, mask, lens
+        return s, a, d, xygoals, waypoints, timesteps, mask
 
     def eval_episodes(target_rew):
         def fn(model):
@@ -211,11 +241,11 @@ def experiment(
                             act_dim,
                             model,
                             max_ep_len=max_ep_len,
-                            scale=scale,
-                            target_return=target_rew/scale,
                             mode=mode,
                             state_mean=state_mean,
                             state_std=state_std,
+                            xy_mean = xy_mean,
+                            xy_std = xy_std,
                             device=device,
                             seed = _, # using 0,1,2 as seeds
                         )
@@ -226,7 +256,6 @@ def experiment(
                             act_dim,
                             model,
                             max_ep_len=max_ep_len,
-                            target_return=target_rew/scale,
                             mode=mode,
                             state_mean=state_mean,
                             state_std=state_std,
@@ -280,17 +309,11 @@ def experiment(
         lr=variant['learning_rate'],
         weight_decay=variant['weight_decay'],
     )
-    if dataset == "None":#'medium-expert':
-        scheduler = torch.optim.lr_scheduler.LambdaLR(
-            optimizer,
-            lambda steps: min((steps+1)/warmup_steps, 1) 
-        )
-    else:
-        lr_ratio = 0.5 
-        scheduler = torch.optim.lr_scheduler.LambdaLR(
-            optimizer,
-            lambda steps: min((steps+1)/warmup_steps, 1) if steps < warmup_steps else lr_ratio + (1-lr_ratio) * ( 0.9997 ** (steps-warmup_steps) )
-        )
+    lr_ratio = 0.5 
+    scheduler = torch.optim.lr_scheduler.LambdaLR(
+        optimizer,
+        lambda steps: min((steps+1)/warmup_steps, 1) if steps < warmup_steps else lr_ratio + (1-lr_ratio) * ( 0.9997 ** (steps-warmup_steps) )
+    )
     # scheduler = transformers.get_cosine_schedule_with_warmup(optimizer, num_warmup_steps = warmup_steps, num_training_steps = variant['num_steps_per_iter'] * variant['max_iters'])
 
     if model_type == 'dt':
@@ -301,14 +324,14 @@ def experiment(
             get_batch=get_batch, # function to process each trajectory from a batch
             scheduler=scheduler,
             loss_fn=lambda s_hat, a_hat, r_hat, s, a, r: torch.mean((a_hat - a)**2),
-            eval_fns=[eval_episodes(tar) for tar in env_targets],
+            eval_fns=[eval_episodes(tar) for tar in [0]],
         )
 
     if log_to_wandb:
         wandb.init(
             name=exp_prefix,
             group=group_name,
-            project= f'dt-exchange-modality-a-s-r-{env_name}-{dataset}',
+            project= f'dt-large-basesline-{env_name}',
             config=variant
         )
         wandb.watch(model)
@@ -344,14 +367,14 @@ if __name__ == '__main__':
     parser.add_argument('--learning_rate', '-lr', type=float, default=1e-4)
     parser.add_argument('--weight_decay', '-wd', type=float, default=1e-4)
     parser.add_argument('--warmup_steps', type=int, default= 10000)
-    parser.add_argument('--num_eval_episodes', type=int, default=3)
-    parser.add_argument('--max_iters', type=int, default=10)
-    parser.add_argument('--num_steps_per_iter', type=int, default=2500)
+    parser.add_argument('--num_eval_episodes', type=int, default=10)
+    parser.add_argument('--max_iters', type=int, default=100)
+    parser.add_argument('--num_steps_per_iter', type=int, default=250)
     parser.add_argument('--device', type=str, default='cpu')
     parser.add_argument('--load_model', type=str, default='NO')
     parser.add_argument('--save_model', type=str, default='NO')
 
-    parser.add_argument('--bias', type=str, default="all")
+    parser.add_argument('--bias', type=str, default="b2")
     parser.add_argument('--comb', type=str, default="c22")
     parser.add_argument('--norm_mode', type=str, default="n3")
     parser.add_argument('--modality_emb', type=int, default= 3)
@@ -360,27 +383,12 @@ if __name__ == '__main__':
     parser.add_argument('--join_all', action ='store_true')
     parser.add_argument('--log_to_wandb', '-w', type=bool, default=False)
     parser.add_argument('--seed', type=int, default= 1)
+    parser.add_argument('--waypoint', type=int, default= 3)
 
     args = parser.parse_args()
-
-    batch = vars(args)['batch_size']
-    modality_emb = vars(args)['modality_emb']
-    dropout = vars(args)['dropout']
-    norm_joint = vars(args)['norm_joint']
-    norm_prefix = 'has' if norm_joint else 'no'
-    join_all = 'all' if vars(args)['join_all'] else 'sa' 
-
+    waypoint = vars(args)['waypoint']
     seed = vars(args)['seed']
-    lr = vars(args)['learning_rate']
-    set_seed(seed) 
-    # set_seed2(seed)
+    # set_seed2(seed) 
+    set_seed(seed)
 
-    experiment(f'DTD-exchange', variant=vars(args))
-
-    # ablation usage
-    # no lr decay for med-expert
-    # experiment(f'Ablation-DTD-{batch}-10kw-{lr}-lr-decay-prenorm3layerencdrs-{ norm_prefix }ln-postnorm', variant=vars(args))
-
-    # 
-    # experiment(f'ReRun-DTD-{batch}-10kwarm-{lr}-lr-decay', variant=vars(args))
-    # experiment(f'NewSeedReRun-DTD-{batch}-10kwarm-{lr}-lr-decay', variant=vars(args))
+    experiment(f'NewSeedDTD-{waypoint}-step-ahead', variant=vars(args))
