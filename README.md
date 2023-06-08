@@ -8,7 +8,7 @@ This repo contains full implementation of a multimodal transformer: Decision Tra
 
 ## Descriptions
 
-### Gym locomotion code (gym-transducer): 
+### Gym locomotion code ([gym-transducer](./gym-transducer)): 
 * Train a Decision Transducer (DTd) model with: 
     * Goal $G_t$ as return: experiment_transducer.py 
     * Goal $G_t$ as state-value from IQL: experiment_transducer_goal.py 
@@ -16,7 +16,7 @@ This repo contains full implementation of a multimodal transformer: Decision Tra
     * Return-to-go with **[original architecture]([https://link-url-here.org](https://github.com/kzl/decision-transformer/tree/master))** : experiment_dt_small.py
     * Return-to-go with DT-large in DTd paper where the model has more heads, layers, and higher dimension.
 
-### Gym AntMaze Navigation code (gym-transducer-goal):
+### Gym AntMaze Navigation code ([gym-transducer-goal](./gym-transducer-goal)):
 * Train a Decision Transducer (DTd) with:
     * Goal $G_t$ as concat(state, goal) + waypoint prediction as auxiliary task: experiment_transducer.py
 * Train a  Decision Transformer (DT) model taking:
