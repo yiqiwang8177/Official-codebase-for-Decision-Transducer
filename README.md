@@ -22,5 +22,5 @@ This repo contains full implementation of a multimodal transformer: Decision Tra
 * Train a  Decision Transformer (DT) model taking:
     * Return-to-go (Caveat: in sparse reward setting, Return-to-go is binary is less useful).
 
-## Environment file: environment.yml
+### Conda Environment file: [environment.yml](./environment.yml)
 
