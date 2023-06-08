@@ -64,22 +64,17 @@ def experiment(
     if env_name == 'hopper':
         env = gym.make('Hopper-v3')
         max_ep_len = 1000
-        # env_targets = [3600, 1800]  
-        # env_targets = [3000, 2400, 1200, 600]
-        env_targets = [6000, 4500,] #  3600, 2400, 1200, 600
+        env_targets = [3600, 1800]  
         scale = 1000.  # normalization for rewards/returns
     elif env_name == 'halfcheetah':
         env = gym.make('HalfCheetah-v3')
         max_ep_len = 1000
         env_targets = [12000, 6000]
-        # env_targets = [10000, 8000, 4000, 2000]
         scale = 1000.
     elif env_name == 'walker2d':
         env = gym.make('Walker2d-v3')
         max_ep_len = 1000
-        # env_targets = [5000, 2500]
-        # env_targets = [4000, 3000, 2000, 1000]
-        env_targets = [9000, 7000]
+        env_targets = [5000, 2500]
         scale = 1000.
     elif env_name == 'antmaze-umaze':
         import d4rl
