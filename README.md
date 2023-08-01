@@ -15,12 +15,15 @@ This repo contains full implementation of a multimodal transformer: Decision Tra
 * Train a Decision Transformer (DT) model taking:
     * Return-to-go with **[original architecture]([https://link-url-here.org](https://github.com/kzl/decision-transformer/tree/master))** : experiment_dt_small.py
     * Return-to-go with DT-large in DTd paper where the model has more heads, layers, and higher dimension.
+* See **exp_sh** to see how to use the experiment script.
 
 ### Gym AntMaze Navigation code ([gym-transducer-goal](./gym-transducer-goal)):
 * Train a Decision Transducer (DTd) with:
     * Goal $G_t$ as concat(state, goal) + waypoint prediction as auxiliary task: experiment_transducer.py
 * Train a  Decision Transformer (DT) model taking:
     * Return-to-go (Caveat: in sparse reward setting, Return-to-go is binary is less useful).
+* See **exp_sh** to see how to use the experiment script.
+      
 
 ### Conda Environment file: [environment.yml](./environment.yml)
 
