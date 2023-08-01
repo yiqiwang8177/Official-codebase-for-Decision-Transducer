@@ -1,5 +1,5 @@
 # Official-codebase-for-Decision-Transducer
-This is the pytorch implementation of the UAI2023 paper  "A Trajectory is Worth Three Sentences: Multimodal Transformer for Offline Reinforcement Learning" [PMLR][https://openreview.net/forum?id=yE1_GpmDOPL](https://proceedings.mlr.press/v216/wang23d.html). A 2:30 [presentation](https://youtu.be/-f3zd_2GWuE).
+This is the pytorch implementation of the UAI2023 paper  "A Trajectory is Worth Three Sentences: Multimodal Transformer for Offline Reinforcement Learning" [PMLR link](https://proceedings.mlr.press/v216/wang23d.html). A 2:30 [presentation](https://youtu.be/-f3zd_2GWuE).
 
 ## Overview
 This repo contains full implementation of a multimodal transformer: Decision Transducer. It was designed to improve transformers performance on offline RL, by disentangling the complicated interactions between modalities (state, action, return/goal).
