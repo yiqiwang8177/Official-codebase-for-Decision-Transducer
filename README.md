@@ -27,3 +27,7 @@ This repo contains full implementation of a multimodal transformer: Decision Tra
 
 ### Conda Environment file: [environment.yml](./environment.yml)
 
+## How to create Multimodal Quantification plot?
+
+* I will make sure to update this after UAI 2023 conference with code examples. 
+
