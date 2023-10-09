@@ -21,7 +21,7 @@ This repo contains full implementation of a multimodal transformer: Decision Tra
 * Train a Decision Transducer (DTd) with:
     * Goal $G_t$ as concat(state, goal) + waypoint prediction as auxiliary task: experiment_transducer.py
 * Train a  Decision Transformer (DT) model taking:
-    * Return-to-go (Caveat: in sparse reward setting, Return-to-go is binary is less useful).
+    * Return-to-go (Caveat: in sparse reward setting, Return-to-go becomes binary and is less useful).
 * See **exp_sh** to see how to use the experiment script.
       
 
