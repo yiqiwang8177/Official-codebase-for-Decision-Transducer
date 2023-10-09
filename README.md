@@ -43,7 +43,7 @@ attn_map = atts[2][0]
 attn_stats( attn_map )
 ```
 * the attn_stats will write out a csv containing the analysis between return, stats, action.
-* concate_files.ipynb provides the final 9 scores (3 modalities x 3 modalities)
+* [concate_files.ipynb](https://github.com/berniewang8177/Official-codebase-for-Decision-Transducer/blob/main/concat_files.ipynb) provides the final 9 scores (3 modalities x 3 modalities)
    * You could reduce this to 6 scores by aggregating a pair of symmetric scores in to 1.
    * E.g., sa_score = sa_score + as_score 
 
