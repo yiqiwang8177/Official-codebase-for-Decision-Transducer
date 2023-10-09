@@ -29,5 +29,19 @@ This repo contains full implementation of a multimodal transformer: Decision Tra
 
 ## How to create Multimodal Quantification plot?
 
-* I will make sure to update this after UAI 2023 conference with code examples. 
+* ~I will make sure to update this after UAI 2023 conference with code examples**~.
+* first thing to do is to yield an attentino map from decision transformer
+   * within the code of forward()
+```ruby
+atts = transformer_outputs['attentions']
+# the code below get last layer  attn map (to reproduce the paper's figure 1)
+attn_map = atts[2][0]
+# You could also get the average across all layer
+# the conclusion doesn't change much
+# attn_map = ( atts[0][0] + atts[1][0]+ atts[2][0] ) / 3
+# create an aggregated analysis via attn_stats)
+attn_stats( attn_map )
+```
+* the attn_stats will write out a csv containing the analysis between return, stats, action.
+* 
 
