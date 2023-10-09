@@ -40,9 +40,9 @@ attn_map = atts[2][0]
 # the conclusion doesn't change much
 # attn_map = ( atts[0][0] + atts[1][0]+ atts[2][0] ) / 3
 # create an aggregated analysis via attn_stats)
-attn_stats( attn_map )
+attn_stats( attn_map ) # import this from attn_stats.py
 ```
-* the attn_stats will write out a csv containing the analysis between return, stats, action.
+* the attn_stats import from [here](https://github.com/berniewang8177/Official-codebase-for-Decision-Transducer/blob/main/attn_stats.py) will write out a csv containing the analysis between return, stats, action.
 * [concate_files.ipynb](https://github.com/berniewang8177/Official-codebase-for-Decision-Transducer/blob/main/concat_files.ipynb) provides the final 9 scores (3 modalities x 3 modalities)
    * You could reduce this to 6 scores by aggregating a pair of symmetric scores in to 1.
    * E.g., sa_score = sa_score + as_score 
